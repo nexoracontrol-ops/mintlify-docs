@@ -1,47 +1,121 @@
 ---
-title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+title: "Quickstart: Run Your First EK-021 Decision"
+sidebarTitle: "Quickstart"
+description: "Install the Python and TypeScript stacks, run the shared test vectors, and build your first EK-021 admissibility decision in code with a working example."
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
-
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
+This quickstart gets you to your first admissible EK-021 decision. You install both parity stacks, run the shared conformance vectors, then build a decision in code against test case TC-001. Every command and code block is grounded in the reference implementations.
 
 ## Prerequisites
 
-Before you begin, you must have:
-
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
-
-## Get started
+- Python 3.10 or later (frozen dataclasses and PEP 604 typing)
+- Node.js 18 or later
+- Both `python/` and `typescript/` folders from the NEXORA Core v1 repository, plus the shared `test-vectors/core-v1.json`
 
 <Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
+  <Step title="Install dependencies">
+    Install the single runtime dep in each stack.
 
-    ```bash
-    npm install your-package
+    <CodeGroup>
+
+    ```bash Python
+    cd python
+    pip install -r requirements.txt
     ```
+
+    ```bash TypeScript
+    cd typescript
+    npm install
+    ```
+
+    </CodeGroup>
+
+    Python installs `rfc8785>=0.1.4`. TypeScript installs `canonicalize@^2.1.0` plus `tsx` and `typescript` as dev dependencies.
   </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
+  <Step title="Run the shared test vectors">
+    Both stacks read `../test-vectors/core-v1.json` and check every case (TC-001-NO-DEVIATION, TC-002-EXCESS-DEDUCTION, TC-003-EVIDENCE_GAP).
 
-    ```bash
-    your-cli init
+    <CodeGroup>
+
+    ```bash Python
+    python -m unittest discover -v
     ```
+
+    ```bash TypeScript
+    npm test
+    ```
+
+    </CodeGroup>
+
+    All three cases must pass in both stacks for the protocol to be considered conformant.
   </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
+  <Step title="Build a decision in code">
+    Construct the TC-001 inputs directly and call `decide()`.
 
-    ```bash
-    your-cli start
+    <CodeGroup>
+
+    ```python Python
+    from nexora_core import EK021, EvidenceAnchor, ControlParam
+    
+    evidence = [
+        EvidenceAnchor("A-01", "CUSTODY_AGREEMENT_HASH", "sha256:agreement-001", "registry", "VERIFIED"),
+        EvidenceAnchor("A-02", "SIGNED_API_PAYLOAD_AMOUNT", "98000", "bank_api", "VERIFIED"),
+    ]
+    controls = [
+        ControlParam("allowed_fee_pct", "2.0", "CLAUSE-4.1"),
+        ControlParam("contract_amount", "100000", "CLAUSE-3.2"),
+    ]
+    print(EK021(evidence, controls).decide())
     ```
+
+    ```typescript TypeScript
+    import { EK021 } from "./nexora_core.js";
+    
+    const evidence = [
+      { anchor_id: "A-01", type: "CUSTODY_AGREEMENT_HASH", value: "sha256:agreement-001", source: "registry", status: "VERIFIED" },
+      { anchor_id: "A-02", type: "SIGNED_API_PAYLOAD_AMOUNT", value: "98000", source: "bank_api", status: "VERIFIED" },
+    ];
+    const controls = [
+      { key: "allowed_fee_pct", value: "2.0", source_clause: "CLAUSE-4.1" },
+      { key: "contract_amount", value: "100000", source_clause: "CLAUSE-3.2" },
+    ];
+    console.log(new EK021(evidence, controls).decide());
+    ```
+
+    </CodeGroup>
+  </Step>
+  <Step title="Read the result">
+    You get an admissible decision with no deviation.
+
+    ```text Expected result
+    status:          ADMISSIBLE_STATE_CONFIRMED
+    resolution_type: CONFIRM
+    expected_amount: 100000.00
+    actual_amount:   98000.00
+    delta_amount:    0.00
+    reason_codes:    ["FEE_WITHIN_ALLOWED_LIMIT"]
+    ```
+
+    The `decision_id` is `EK021-<first 12 hex of input_sha256>`. Both stacks produce the exact same digest, `decision_id`, and monetary strings for this input.
   </Step>
 </Steps>
 
-<Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
+## Next steps
 
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
-</Tip>
+<CardGroup cols={2}>
+  <Card title="EK-021 concept" icon="code" href="/concepts/ek021">
+    Learn the canonical input, digest, and decision pipeline.
+  </Card>
+
+  <Card title="Parity testing" icon="puzzle" href="/guides/parity-testing">
+    Confirm both stacks stay byte-identical over time.
+  </Card>
+
+  <Card title="Python SDK" icon="terminal" href="/sdks/python">
+    Full Python API and imports.
+  </Card>
+
+  <Card title="TypeScript SDK" icon="terminal" href="/sdks/typescript">
+    Full TypeScript API and monetary helpers.
+  </Card>
+</CardGroup>

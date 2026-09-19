@@ -1,0 +1,105 @@
+---
+title: "Canonical Input: L0 Fields and Digest Pipeline"
+sidebarTitle: "Canonical Input"
+description: "Canonical input defines exactly which evidence and control fields enter the EK-021 digest. Only L0 fields are serialized with RFC 8785 JCS and hashed with SHA-256."
+---
+
+Canonical input is the foundation of deterministic parity in NEXORA Core v1. EK-021 accepts rich evidence and control objects at runtime, but only a strict subset of fields, called L0, enters the digest. This ensures that two implementations running on different hosts produce identical SHA-256 hashes for the same logical input. This page documents the L0 field list, the exclusion rules, and the JCS + SHA-256 pipeline.
+
+## L0 fields
+
+Only the following keys from each evidence anchor and control parameter are included in the canonical input.
+
+### Evidence anchors
+
+| Field | Description |
+| --- | --- |
+| `anchor_id` | Identifier of the evidence anchor |
+| `type` | Evidence type, such as `CUSTODY_AGREEMENT_HASH` |
+| `value` | The evidence value |
+| `source` | Origin of the evidence |
+| `status` | Verification status, such as `VERIFIED` |
+
+### Control parameters
+
+| Field | Description |
+| --- | --- |
+| `key` | Control key, such as `contract_amount` |
+| `value` | Control value |
+| `source_clause` | Clause reference, such as `CLAUSE-3.2` |
+
+## Exclusion list
+
+The following must **never** appear in the canonical input. Adding any of them breaks cross-implementation parity.
+
+- UUIDs
+- Timestamps
+- Runtime metadata
+- Map or object-generated ordering
+- Host-specific fields
+
+<Warning>
+  Adding any field outside the L0 set changes the JCS output and therefore the SHA-256 digest. This makes the implementation non-conformant according to Protocol Lock L6.
+</Warning>
+
+## L1 canonicalization: RFC 8785 JCS
+
+The L0 fields are wrapped in a plain object with two arrays, `evidence` and `controls`, and serialized with **RFC 8785 JSON Canonicalization Scheme (JCS)**. JCS guarantees that the same logical data always produces the same UTF-8 byte sequence, regardless of how the original objects were constructed.
+
+## L2 digest: SHA-256
+
+The exact JCS UTF-8 bytes are hashed with **SHA-256**. The resulting hex string is exposed as `input_sha256` and is also used to form the `decision_id`.
+
+## Code example: TC-001
+
+The following shows the canonical input and resulting digest for test case `TC-001-NO-DEVIATION` from `test-vectors/core-v1.json`.
+
+<CodeGroup>
+
+```python Python
+engine = EK021(evidence, controls)
+canonical = engine.canonical_input()
+# {
+#   "evidence": [
+#     {"anchor_id":"A-01","type":"CUSTODY_AGREEMENT_HASH","value":"sha256:agreement-001","source":"registry","status":"VERIFIED"},
+#     {"anchor_id":"A-02","type":"SIGNED_API_PAYLOAD_AMOUNT","value":"98000","source":"bank_api","status":"VERIFIED"}
+#   ],
+#   "controls": [
+#     {"key":"allowed_fee_pct","value":"2.0","source_clause":"CLAUSE-4.1"},
+#     {"key":"contract_amount","value":"100000","source_clause":"CLAUSE-3.2"}
+#   ]
+# }
+digest = engine.input_sha256()
+# "9f7b7a3f..."
+decision_id = f"EK021-{digest[:12]}"
+# e.g. "EK021-9f7b7a3f3f7f"
+```
+
+```typescript TypeScript
+const engine = new EK021(evidence, controls);
+const canonical = engine.canonicalInput();
+// {
+//   evidence: [
+//     { anchor_id: "A-01", type: "CUSTODY_AGREEMENT_HASH", value: "sha256:agreement-001", source: "registry", status: "VERIFIED" },
+//     { anchor_id: "A-02", type: "SIGNED_API_PAYLOAD_AMOUNT", value: "98000", source: "bank_api", status: "VERIFIED" }
+//   ],
+//   controls: [
+//     { key: "allowed_fee_pct", value: "2.0", source_clause: "CLAUSE-4.1" },
+//     { key: "contract_amount", value: "100000", source_clause: "CLAUSE-3.2" }
+//   ]
+// }
+const digest = engine.inputSha256();
+// "9f7b7a3f..."
+const decision_id = `EK021-${digest.slice(0, 12)}`;
+// e.g. "EK021-9f7b7a3f3f7f"
+```
+
+</CodeGroup>
+
+## Shared conformance fixture
+
+Protocol Lock L6 defines the shared test vectors at `test-vectors/core-v1.json`. Any implementation that produces a different digest or decision for the same vector is non-conformant. The fixture includes expected SHA-256 values for stable cases and placeholder markers for cases where only the decision logic is verified.
+
+<Info>
+  See <a href="/guides/test-vectors">Test Vectors</a> for instructions on running the conformance suite in Python and TypeScript.
+</Info>

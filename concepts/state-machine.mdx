@@ -1,0 +1,118 @@
+---
+title: "Core State Machine: Integration Surface for EK-021"
+sidebarTitle: "State Machine"
+description: "The CoreStateMachine is an integration surface that tracks protocol lifecycle states. It sits alongside EK-021 and is triggered by mapping admissibility decisions to state transitions."
+---
+
+The `CoreStateMachine` is the integration surface described in Protocol Lock L7. It is **not** part of EK-021. Instead, it lives alongside the decision engine and tracks the lifecycle of a protocol instance from initial evidence collection through settlement or termination. A caller runs EK-021 to produce a `Decision`, then maps that decision to a state machine trigger to advance the workflow. This page explains the state and trigger model, how decisions map to transitions, and where the boundary lies between deciding and acting.
+
+## What the state machine is
+
+`CoreStateMachine` manages a finite set of states and legal transitions. It records every transition in an append-only history and rejects illegal triggers with an error. Both the Python and TypeScript implementations share the same transition table and state identifiers.
+
+## State identifiers
+
+States are labeled with human names and short IDs.
+
+| State | ID | Description |
+| --- | --- | --- |
+| INITIAL | S0 | Starting state before any evidence is collected |
+| EVIDENCE_COLLECTED | S1 | Evidence has been submitted |
+| INSUFFICIENT | S1a | Evidence is incomplete |
+| RESOLVED | S2 | Resolution is complete |
+| MISMATCH | S2a | A deviation was detected |
+| CLAIMED | S2b | A claim has been validated |
+| AUTHORIZED | S3 | Execution has been authorized |
+| DENIED | S3a | Authorization was denied |
+| REJECTED | S3b | Permanently rejected |
+| EXECUTED | S4 | Execution has occurred |
+| FAILED | S4a | External failure occurred |
+| RETRY | S4b | A retry is in progress |
+| VERIFIED | S5 | Outcome has been verified |
+| DISCREPANCY | S5a | Outcome mismatch detected |
+| RECONCILE | S5b | Under manual review |
+| SETTLED | S6 | Settlement reached |
+| TERMINAL | TERMINAL | Final, terminal state |
+
+## Trigger identifiers
+
+Triggers are events that drive state transitions.
+
+| Trigger | ID | Typical cause |
+| --- | --- | --- |
+| EVIDENCE_COLLECTED | T01 | New evidence submitted |
+| RESOLUTION_COMPLETE | T02 | EK-021 decision is admissible |
+| DELTA_DETECTED | T03 | EK-021 decision shows a deviation |
+| CLAIM_VALIDATED | T04 | Claim has been validated |
+| AUTHORIZED | T05 | Execution authorized |
+| EXECUTED | T06 | Execution completed |
+| OUTCOME_VERIFIED | T07 | External outcome verified |
+| OUTCOME_MISMATCH | T08 | Verification mismatch |
+| RECEIPT_ISSUED | T09 | Economic Receipt issued |
+| INSUFFICIENT_DATA | TX | EK-021 evidence gap |
+| FAILED_EXTERNAL | TF | External system failure |
+| RETRY_LIMIT | TR | Retry limit reached |
+| MANUAL_REVIEW | TMR | Escalated to manual review |
+
+## Mapping EK-021 decisions to triggers
+
+After you call `EK021.decide()`, map the resulting `Decision` to a state machine trigger based on the `status` and `resolution_type`.
+
+<Steps>
+  <Step title="CONFIRM / ADMISSIBLE_STATE_CONFIRMED">
+    From `EVIDENCE_COLLECTED` (S1), fire `RESOLUTION_COMPLETE` (T02) to move to `RESOLVED` (S2).
+  </Step>
+  <Step title="CLAIM / ADMISSIBLE_DEVIATION_DETECTED">
+    From `EVIDENCE_COLLECTED` (S1), first fire `RESOLUTION_COMPLETE` (T02) to reach `RESOLVED` (S2). Then fire `DELTA_DETECTED` (T03) to move to `MISMATCH` (S2a).
+  </Step>
+  <Step title="null / INADMISSIBLE_EVIDENCE_GAP">
+    From `EVIDENCE_COLLECTED` (S1), fire `INSUFFICIENT_DATA` (TX) to move to `INSUFFICIENT` (S1a).
+  </Step>
+</Steps>
+
+This mapping is a convention, not a hardcoded link inside EK-021. Your integration layer is responsible for interpreting the decision and choosing the correct trigger.
+
+## Checking and firing transitions
+
+Both implementations expose the same API.
+
+<CodeGroup>
+
+```python Python
+sm = CoreStateMachine()
+assert sm.state == State.INITIAL
+
+# Check if a trigger is legal
+if sm.can_transition(Trigger.EVIDENCE_COLLECTED):
+    sm.transition(Trigger.EVIDENCE_COLLECTED, metadata={"case": "TC-001"})
+
+# Illegal transitions raise ValueError
+sm.transition(Trigger.AUTHORIZED)  # ValueError
+```
+
+```typescript TypeScript
+const sm = new CoreStateMachine();
+console.assert(sm.state === State.INITIAL);
+
+// Check if a trigger is legal
+if (sm.canTransition(Trigger.EVIDENCE_COLLECTED)) {
+  sm.transition(Trigger.EVIDENCE_COLLECTED, { case: "TC-001" });
+}
+
+// Illegal transitions throw Error
+sm.transition(Trigger.AUTHORIZED); // throws Error
+```
+
+</CodeGroup>
+
+## EK-021 boundary reminder
+
+EK-021 does not write state, authorize execution, or issue receipts. The state machine is the layer that performs those actions. EK-021 only produces the admissibility decision that informs which trigger your integration should fire next.
+
+<Info>
+  For the complete transition table, see <a href="/reference/states-and-triggers">States and Triggers</a>.
+</Info>
+
+<Info>
+  For a step-by-step guide to wiring EK-021 into the state machine, see <a href="/guides/integrating-state-machine">Integrating the State Machine</a>.
+</Info>

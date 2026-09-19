@@ -1,0 +1,130 @@
+---
+title: "Python SDK for NEXORA Core v1 and EK-021"
+sidebarTitle: "Python"
+description: "The NEXORA Core Python SDK exposes EK-021, dataclasses for evidence and controls, and helpers for canonicalization, hashing, and monetary quantization."
+---
+
+The Python SDK is a single module, `nexora_core`, that implements EK-021 and the shared canonical input, JCS, and SHA-256 pipeline. All monetary math uses `Decimal` with `ROUND_HALF_UP`. This page covers the full public surface and shows a complete decision example against the TC-002 vector.
+
+## Install
+
+The only runtime dependency is `rfc8785`.
+
+```bash
+cd python
+pip install -r requirements.txt
+```
+
+`requirements.txt`:
+
+```text
+rfc8785>=0.1.4
+```
+
+## Public API
+
+| Symbol | Kind | Purpose |
+| --- | --- | --- |
+| `EK021` | class | Decision engine; `VERSION = "1.0.0"` |
+| `EvidenceAnchor` | frozen dataclass | Evidence tuple (`anchor_id`, `type`, `value`, `source`, `status`) |
+| `ControlParam` | frozen dataclass | Control tuple (`key`, `value`, `source_clause`) |
+| `Decision` | frozen dataclass | Result of `EK021.decide()` |
+| `Status` | `str` Enum | Three admissibility statuses |
+| `jcs_bytes(value)` | function | RFC 8785 JCS bytes of `value` |
+| `sha256_hex(data)` | function | Hex SHA-256 of bytes |
+| `money(v: Decimal)` | function | Quantize to `0.01` with `ROUND_HALF_UP` |
+| `load_vectors()` | function | Load `../test-vectors/core-v1.json` relative to the module |
+
+### `EK021`
+
+Constructor: `EK021(evidence: list[EvidenceAnchor], controls: list[ControlParam])`. Internally, evidence and controls are stored as tuples for immutability.
+
+Methods:
+
+- `canonical_input() -> dict` returns the L0 object with only the permitted fields.
+- `input_sha256() -> str` returns the SHA-256 hex over JCS bytes.
+- `verified(typ: str) -> Optional[str]` returns the first evidence value with matching `type` and `status == "VERIFIED"`.
+- `control(key: str) -> Optional[str]` returns the first control value for `key`.
+- `decide() -> Decision` runs the branching logic; see [Decisions](/concepts/decisions).
+
+### `Decision` fields
+
+<ResponseField name="decision_id" type="string">
+  `EK021-<first 12 hex of input_sha256>`.
+</ResponseField>
+
+<ResponseField name="status" type="Status">
+  One of `ADMISSIBLE_STATE_CONFIRMED`, `ADMISSIBLE_DEVIATION_DETECTED`, `INADMISSIBLE_EVIDENCE_GAP`.
+</ResponseField>
+
+<ResponseField name="resolution_type" type="string | None">
+  `CONFIRM`, `CLAIM`, or `None` per L4.
+</ResponseField>
+
+<ResponseField name="expected_amount" type="string">
+  Contract amount as `"D.CC"`, or `"0.00"` on evidence gap.
+</ResponseField>
+
+<ResponseField name="actual_amount" type="string">
+  Signed API payload amount as `"D.CC"`, or `"0.00"` on evidence gap.
+</ResponseField>
+
+<ResponseField name="delta_amount" type="string">
+  Excess deduction as `"D.CC"`, or `"0.00"`.
+</ResponseField>
+
+<ResponseField name="reason_codes" type="tuple[str, ...]">
+  One of `MISSING_REQUIRED_ANCHOR`, `FEE_WITHIN_ALLOWED_LIMIT`, `EXCESS_DEDUCTION`.
+</ResponseField>
+
+<ResponseField name="input_sha256" type="string">
+  Hex SHA-256 over JCS bytes of `canonical_input()`.
+</ResponseField>
+
+## Deviation example (TC-002)
+
+```python nexora_example.py
+from nexora_core import EK021, EvidenceAnchor, ControlParam
+
+evidence = [
+    EvidenceAnchor("A-01", "CUSTODY_AGREEMENT_HASH", "sha256:agreement-001", "registry", "VERIFIED"),
+    EvidenceAnchor("A-02", "SIGNED_API_PAYLOAD_AMOUNT", "95000", "bank_api", "VERIFIED"),
+]
+controls = [
+    ControlParam("allowed_fee_pct", "2.0", "CLAUSE-4.1"),
+    ControlParam("contract_amount", "100000", "CLAUSE-3.2"),
+]
+
+decision = EK021(evidence, controls).decide()
+print(decision.status.value)        # ADMISSIBLE_DEVIATION_DETECTED
+print(decision.resolution_type)     # CLAIM
+print(decision.delta_amount)        # 3000.00
+print(decision.reason_codes)        # ('EXCESS_DEDUCTION',)
+```
+
+Contract 100000, actual 95000, allowed fee 2.0 percent. Max deduction is 2000; actual deduction is 5000; delta 3000.00 exceeds the limit, so the status is `ADMISSIBLE_DEVIATION_DETECTED` with reason `EXCESS_DEDUCTION`.
+
+## Run the tests
+
+```bash
+cd python
+python -m unittest discover -v
+```
+
+The suite iterates every case in `test-vectors/core-v1.json`. When an expected `input_sha256` starts with `REPLACE`, the hash assertion is intentionally skipped so that the lock step can regenerate it. See [Parity Testing](/guides/parity-testing) and [Test Vectors](/guides/test-vectors).
+
+<Note>
+  Dataclasses are frozen. Rebuild the list to change evidence or controls; you cannot mutate them in place.
+</Note>
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="EK-021 concept" icon="code" href="/concepts/ek021">
+    The full pipeline.
+  </Card>
+
+  <Card title="Reason codes" icon="book" href="/reference/reason-codes">
+    Every code emitted by `decide()`.
+  </Card>
+</CardGroup>

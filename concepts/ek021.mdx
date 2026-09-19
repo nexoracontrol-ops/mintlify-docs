@@ -1,0 +1,74 @@
+---
+title: "EK-021: Deterministic Admissibility Engine"
+sidebarTitle: "EK-021"
+description: "EK-021 is the central admissibility decision engine in NEXORA Core v1. It produces a deterministic Decision from canonical evidence and controls."
+---
+
+EK-021 is the admissibility decision engine at the heart of NEXORA Core v1. Given a set of evidence anchors and control parameters, it produces a deterministic `Decision` that states whether the submitted evidence is admissible, whether a deviation exists, and what monetary delta (if any) was detected. Every implementation, whether in Python or TypeScript, must produce the same digest and the same decision for the same input. This page explains how EK-021 works, what it guarantees, and where its authority ends.
+
+## Decision pipeline
+
+EK-021 processes input through a strict, three-stage pipeline:
+
+<Steps>
+  <Step title="Canonical input">
+    Only L0 fields from evidence and controls are collected. No UUIDs, timestamps, runtime metadata, or host-specific fields are included.
+  </Step>
+  <Step title="Canonicalization">
+    The canonical input is serialized with **RFC 8785 JCS** to produce deterministic UTF-8 bytes.
+  </Step>
+  <Step title="Digest and decide">
+    The JCS bytes are hashed with **SHA-256**. The hex digest forms the basis of the `decision_id` and the `input_sha256` field in the resulting `Decision`.
+  </Step>
+</Steps>
+
+## Version
+
+Both the Python and TypeScript implementations declare the same version.
+
+<CodeGroup>
+
+```python Python
+class EK021:
+    VERSION = "1.0.0"
+```
+
+```typescript TypeScript
+export class EK021 {
+  readonly version = "1.0.0";
+}
+```
+
+</CodeGroup>
+
+## Authority boundary
+
+EK-021 is an **admissibility decision engine only**. It does not perform any action beyond producing a `Decision`. Specifically, EK-021 does **not**:
+
+- Write economic state
+- Authorize execution
+- Execute transactions
+- Verify external outcomes
+- Settle claims
+- Assign recovered value
+- Issue an Economic Receipt
+
+<Info>
+  Any system that needs to act on an EK-021 decision, such as advancing a state machine or recording a settlement, must do so in a separate component outside EK-021. See the <a href="/concepts/state-machine">State Machine</a> page for the integration surface described in Protocol Lock L7.
+</Info>
+
+## Explore related concepts
+
+<CardGroup cols={3}>
+  <Card title="Canonical Input" href="/concepts/canonical-input">
+    Learn which fields enter the digest and how JCS + SHA-256 guarantee parity.
+  </Card>
+
+  <Card title="Decisions" href="/concepts/decisions">
+    Understand the Decision object, status codes, and branching logic.
+  </Card>
+
+  <Card title="Authority Boundary" href="/reference/authority-boundary">
+    Reference list of everything EK-021 explicitly does not do.
+  </Card>
+</CardGroup>

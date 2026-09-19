@@ -1,0 +1,119 @@
+---
+title: "TypeScript SDK for NEXORA Core v1 and EK-021"
+sidebarTitle: "TypeScript"
+description: "The NEXORA Core TypeScript SDK ships EK-021, canonical input helpers, and bigint cent utilities that guarantee monetary parity with the Python implementation."
+---
+
+The TypeScript SDK is a single module, `nexora_core.ts`, that mirrors the Python implementation of EK-021. All monetary math runs on `bigint` cents (never `Number`) so digests, decision fields, and monetary strings match Python byte for byte on the shared test vectors.
+
+## Install
+
+Runtime dependency: `canonicalize`. Dev dependencies: `tsx` and `typescript`.
+
+```bash
+cd typescript
+npm install
+```
+
+`package.json`:
+
+```json package.json
+{
+  "name": "nexora-core-v1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "tsx --test test_core.ts",
+    "run": "tsx nexora_core.ts"
+  },
+  "dependencies": {
+    "canonicalize": "^2.1.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
+```
+
+## Public API
+
+| Symbol | Kind | Purpose |
+| --- | --- | --- |
+| `EK021` | class | Decision engine; `readonly version = "1.0.0"` |
+| `EvidenceAnchor` | interface | Evidence shape |
+| `ControlParam` | interface | Control shape |
+| `Decision` | interface | Result of `decide()` |
+| `Status` | union type | `"ADMISSIBLE_STATE_CONFIRMED" \| "ADMISSIBLE_DEVIATION_DETECTED" \| "INADMISSIBLE_EVIDENCE_GAP"` |
+| `jcsBytes(value)` | function | RFC 8785 JCS UTF-8 bytes via `canonicalize` |
+| `sha256Hex(data)` | function | Hex SHA-256 using `node:crypto` |
+
+### Monetary helpers
+
+The module also exports the arithmetic helpers used by `decide()`.
+
+<ParamField path="decimalToCents(v: string): bigint" type="function">
+  Parses `"D.CC..."` into signed cents. Rounds the third fractional digit if present (>= 5 rounds up).
+</ParamField>
+
+<ParamField path="centsToMoney(cents: bigint): string" type="function">
+  Formats a signed cents value back to `"D.CC"` with a `-` prefix for negatives.
+</ParamField>
+
+<ParamField path="percentToBps(p: string): bigint" type="function">
+  Converts a percent string (up to two decimal places) to basis points. `"2.0"` becomes `200n`.
+</ParamField>
+
+<Warning>
+  Never use `Number` for monetary values in this stack. IEEE-754 rounding breaks parity with the Python `Decimal` implementation. Use `decimalToCents` and stay in `bigint` until you format for display.
+</Warning>
+
+## `EK021` class
+
+Constructor: `new EK021(evidence: EvidenceAnchor[], controls: ControlParam[])`.
+
+Methods:
+
+- `canonicalInput()` returns the L0 object with only the permitted fields.
+- `inputSha256(): string` returns the hex SHA-256 over JCS bytes.
+- `verified(type: string): string | undefined` returns the first evidence value with matching `type` and `status === "VERIFIED"`.
+- `control(key: string): string | undefined` returns the first control value for `key`.
+- `decide(): Decision` runs the branching logic. In the deviation branch, `maxDeduction = (expected * feeBps) / 10000n` using basis points.
+
+## Deviation example (TC-002)
+
+```typescript nexora_example.ts
+import { EK021 } from "./nexora_core.js";
+
+const evidence = [
+  { anchor_id: "A-01", type: "CUSTODY_AGREEMENT_HASH", value: "sha256:agreement-001", source: "registry", status: "VERIFIED" },
+  { anchor_id: "A-02", type: "SIGNED_API_PAYLOAD_AMOUNT", value: "95000", source: "bank_api", status: "VERIFIED" },
+];
+const controls = [
+  { key: "allowed_fee_pct", value: "2.0", source_clause: "CLAUSE-4.1" },
+  { key: "contract_amount", value: "100000", source_clause: "CLAUSE-3.2" },
+];
+
+const decision = new EK021(evidence, controls).decide();
+console.log(decision.status);          // ADMISSIBLE_DEVIATION_DETECTED
+console.log(decision.resolution_type); // CLAIM
+console.log(decision.delta_amount);    // 3000.00
+console.log(decision.reason_codes);    // [ 'EXCESS_DEDUCTION' ]
+```
+
+## Scripts
+
+- `npm test` runs `tsx --test test_core.ts` against the shared vectors.
+- `npm run run` executes `nexora_core.ts` for ad-hoc inspection.
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Money handling" icon="code" href="/concepts/money">
+    Why cents, why bigint, and how percent conversion works.
+  </Card>
+
+  <Card title="EK-021 concept" icon="lightbulb" href="/concepts/ek021">
+    The full pipeline shared with Python.
+  </Card>
+</CardGroup>

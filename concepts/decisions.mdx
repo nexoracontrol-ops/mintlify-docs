@@ -1,0 +1,136 @@
+---
+title: "Decision Object, Status Codes, and Branching Logic"
+sidebarTitle: "Decisions"
+description: "The EK-021 Decision object carries the admissibility result, monetary amounts, and reason codes. Learn the three status branches and how decide() evaluates evidence."
+---
+
+The `Decision` object is the sole output of EK-021. It tells you whether the submitted evidence is admissible, whether a monetary deviation exists, and why. This page documents every field in the Decision, the three possible status and resolution_type pairs, and the exact branching logic inside `decide()`.
+
+## Decision fields
+
+<ResponseField name="decision_id" type="string">
+  Formatted as `EK021-{first 12 hex of input_sha256}`.
+</ResponseField>
+
+<ResponseField name="status" type="Status">
+  One of `ADMISSIBLE_STATE_CONFIRMED`, `ADMISSIBLE_DEVIATION_DETECTED`, or `INADMISSIBLE_EVIDENCE_GAP`.
+</ResponseField>
+
+<ResponseField name="resolution_type" type="string | null">
+  `CONFIRM` when the state is confirmed, `CLAIM` when a deviation is detected, or `null` when evidence is insufficient.
+</ResponseField>
+
+<ResponseField name="expected_amount" type="string">
+  The contract amount as a decimal string quantized to `0.01`.
+</ResponseField>
+
+<ResponseField name="actual_amount" type="string">
+  The verified signed API payload amount as a decimal string quantized to `0.01`.
+</ResponseField>
+
+<ResponseField name="delta_amount" type="string">
+  The computed delta as a decimal string. `"0.00"` when no deviation is detected.
+</ResponseField>
+
+<ResponseField name="reason_codes" type="string[]">
+  Tuple or array of reason codes. Exactly one code is returned for every decision.
+</ResponseField>
+
+<ResponseField name="input_sha256" type="string">
+  The SHA-256 hex digest of the canonical input bytes.
+</ResponseField>
+
+## Status and resolution_type pairs
+
+Protocol Lock L4 defines exactly three valid pairs.
+
+| Status | resolution_type | Meaning |
+| --- | --- | --- |
+| `ADMISSIBLE_STATE_CONFIRMED` | `CONFIRM` | Evidence is complete and the actual amount is within the allowed fee limit. |
+| `ADMISSIBLE_DEVIATION_DETECTED` | `CLAIM` | Evidence is complete but the actual deduction exceeds the allowed fee limit. |
+| `INADMISSIBLE_EVIDENCE_GAP` | `null` | Required evidence anchors are missing. |
+
+## Branching logic in decide()
+
+EK-021 evaluates evidence in the following order. Each branch is deterministic and produces exactly one of the three status pairs above.
+
+<Steps>
+  <Step title="Check required anchors">
+    EK-021 requires two verified evidence anchors:
+
+    - `CUSTODY_AGREEMENT_HASH`
+    - `SIGNED_API_PAYLOAD_AMOUNT`
+
+    If either is missing, `decide()` returns immediately:
+
+    - `status`: `INADMISSIBLE_EVIDENCE_GAP`
+    - `resolution_type`: `null`
+    - All amounts: `"0.00"`
+    - `reason_codes`: `("MISSING_REQUIRED_ANCHOR",)`
+  </Step>
+  <Step title="Load amounts and fee">
+    - `expected = contract_amount` control value
+    - `actual = SIGNED_API_PAYLOAD_AMOUNT` evidence value
+    - `fee_pct = allowed_fee_pct / 100`
+  </Step>
+  <Step title="Compute delta">
+    - `max_deduction = expected * fee_pct`
+    - `actual_deduction = expected - actual`
+    - `delta = actual_deduction - max_deduction`
+  </Step>
+  <Step title="Return decision">
+    If `delta > 0`:
+
+    - `status`: `ADMISSIBLE_DEVIATION_DETECTED`
+    - `resolution_type`: `CLAIM`
+    - `delta_amount`: money(delta)
+    - `reason_codes`: `("EXCESS_DEDUCTION",)`
+
+    Otherwise:
+
+    - `status`: `ADMISSIBLE_STATE_CONFIRMED`
+    - `resolution_type`: `CONFIRM`
+    - `delta_amount`: `"0.00"`
+    - `reason_codes`: `("FEE_WITHIN_ALLOWED_LIMIT",)`
+  </Step>
+</Steps>
+
+## Worked examples
+
+### TC-001: No deviation
+
+- `contract_amount` = `100000`
+- `SIGNED_API_PAYLOAD_AMOUNT` = `98000`
+- `allowed_fee_pct` = `2.0`
+
+`max_deduction` = `100000 * 0.02` = `2000`
+
+`actual_deduction` = `100000 - 98000` = `2000`
+
+`delta` = `2000 - 2000` = `0`
+
+Result: `ADMISSIBLE_STATE_CONFIRMED` / `CONFIRM`, `delta_amount` = `"0.00"`, reason `FEE_WITHIN_ALLOWED_LIMIT`.
+
+### TC-002: Excess deduction
+
+- `contract_amount` = `100000`
+- `SIGNED_API_PAYLOAD_AMOUNT` = `95000`
+- `allowed_fee_pct` = `2.0`
+
+`max_deduction` = `100000 * 0.02` = `2000`
+
+`actual_deduction` = `100000 - 95000` = `5000`
+
+`delta` = `5000 - 2000` = `3000`
+
+Result: `ADMISSIBLE_DEVIATION_DETECTED` / `CLAIM`, `delta_amount` = `"3000.00"`, reason `EXCESS_DEDUCTION`.
+
+### TC-003: Evidence gap
+
+- `CUSTODY_AGREEMENT_HASH` is missing
+
+Result: `INADMISSIBLE_EVIDENCE_GAP` / `null`, all amounts `"0.00"`, reason `MISSING_REQUIRED_ANCHOR`.
+
+<Info>
+  For the full conformance fixture, see <a href="/guides/test-vectors">Test Vectors</a>. For how monetary values are handled, see <a href="/concepts/money">Money</a>.
+</Info>

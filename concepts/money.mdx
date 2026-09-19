@@ -1,0 +1,119 @@
+---
+title: "Money Handling: Decimal Strings and BigInt Cents"
+sidebarTitle: "Money"
+description: "NEXORA Core v1 represents all monetary values as decimal strings. Python uses Decimal with ROUND_HALF_UP, and TypeScript uses bigint cents to avoid IEEE-754 rounding errors."
+---
+
+Protocol Lock L3 requires that all monetary values in NEXORA Core v1 be decimal strings. This rule exists to eliminate the rounding errors that come from IEEE-754 floating-point arithmetic. The Python and TypeScript implementations follow the same rule with different but equivalent mechanics: Python uses `Decimal` with `ROUND_HALF_UP` quantization, while TypeScript uses `bigint` cents. This page explains both approaches and shows how to convert, round, and compare money safely.
+
+## Protocol rule
+
+Monetary values are always represented as decimal strings with exactly two fractional digits, such as `"100000.00"` or `"3000.00"`. No implementation is permitted to use raw `float`, `double`, or JavaScript `Number` for money arithmetic.
+
+## Python: Decimal with ROUND_HALF_UP
+
+The Python implementation uses the standard library `Decimal` class. Every monetary result is quantized to `0.01` with `ROUND_HALF_UP`.
+
+```python Python
+from decimal import Decimal, ROUND_HALF_UP
+
+def money(v: Decimal) -> str:
+    return str(v.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+```
+
+In `decide()`, the contract amount, actual amount, and fee percentage are all parsed as `Decimal` before arithmetic is performed. This guarantees that multiplication, subtraction, and comparison behave exactly as specified by the protocol vectors.
+
+## TypeScript: bigint cents
+
+The TypeScript implementation never uses `Number` for money. Instead, it converts decimal strings to **bigint cents** and performs all arithmetic in integer space. Three helpers handle the conversions.
+
+### decimalToCents
+
+Parses a decimal string into cents as a `bigint`, rounding the third fractional digit (5 or above rounds up).
+
+```typescript TypeScript
+function decimalToCents(v: string): bigint {
+  const s = v.trim();
+  const m = s.match(/^(?<sign>[+-]?)(?<whole>\d+)(?:\.(?<frac>\d{1,}))?$/);
+  if (!m) throw new Error(`Invalid decimal: ${v}`);
+  const sign = m.groups!.sign === "-" ? -1n : 1n;
+  const frac = (m.groups!.frac ?? "").padEnd(2, "0");
+  const rounded = frac.length > 2
+    ? BigInt(frac.slice(0, 2)) + (Number(frac[2]) >= 5 ? 1n : 0n)
+    : BigInt(frac || "0");
+  return sign * (BigInt(m.groups!.whole) * 100n + rounded);
+}
+```
+
+### centsToMoney
+
+Formats a `bigint` of cents back into a decimal string with two fractional digits.
+
+```typescript TypeScript
+function centsToMoney(cents: bigint): string {
+  const sign = cents < 0n ? "-" : "";
+  const x = cents < 0n ? -cents : cents;
+  return `${sign}${x / 100n}.${(x % 100n).toString().padStart(2, "0")}`;
+}
+```
+
+### percentToBps
+
+Converts a percentage string (up to two decimals) into basis points as a `bigint`. For example, `"2.0"` becomes `200n` basis points. The denominator in fee calculations is `10000n`.
+
+```typescript TypeScript
+function percentToBps(p: string): bigint {
+  const m = p.trim().match(/^(\d+)(?:\.(\d{1,2}))?$/);
+  if (!m) throw new Error(`Invalid percentage: ${p}`);
+  return BigInt(m[1]) * 100n + BigInt((m[2] ?? "").padEnd(2, "0"));
+}
+```
+
+In `decide()`, the max deduction is computed as:
+
+```typescript TypeScript
+const maxDeduction = (expected * feeBps) / 10000n;
+```
+
+## Side-by-side comparison
+
+<CodeGroup>
+
+```python Python
+from decimal import Decimal, ROUND_HALF_UP
+
+expected = Decimal("100000")
+actual   = Decimal("95000")
+fee_pct  = Decimal("2.0") / Decimal("100")
+
+max_deduction    = expected * fee_pct          # 2000.00
+actual_deduction = expected - actual            # 5000.00
+delta            = actual_deduction - max_deduction  # 3000.00
+
+def money(v: Decimal) -> str:
+    return str(v.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+print(money(delta))  # "3000.00"
+```
+
+```typescript TypeScript
+const expected = decimalToCents("100000"); // 10000000n
+const actual   = decimalToCents("95000");  // 9500000n
+const feeBps   = percentToBps("2.0");      // 200n
+
+const maxDeduction    = (expected * feeBps) / 10000n; // 200000n
+const actualDeduction = expected - actual;             // 500000n
+const delta           = actualDeduction - maxDeduction; // 300000n
+
+console.log(centsToMoney(delta)); // "3000.00"
+```
+
+</CodeGroup>
+
+<Warning>
+  Never use JavaScript `Number` for money in the TypeScript implementation. IEEE-754 arithmetic can introduce sub-cent errors that break protocol parity.
+</Warning>
+
+<Info>
+  For the full decision logic that uses these money helpers, see <a href="/concepts/decisions">Decisions</a>.
+</Info>

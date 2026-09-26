@@ -1,6 +1,6 @@
 ---
-title: "Canonical Input: L0 Fields and Digest Pipeline"
-sidebarTitle: "Canonical Input"
+title: "Canonical input: L0 fields and digest pipeline"
+sidebarTitle: "Canonical input"
 description: "Canonical input defines exactly which evidence and control fields enter the EK-021 digest. Only L0 fields are serialized with RFC 8785 JCS and hashed with SHA-256."
 ---
 
@@ -101,5 +101,5 @@ const decision_id = `EK021-${digest.slice(0, 12)}`;
 Protocol Lock L6 defines the shared test vectors at `test-vectors/core-v1.json`. Any implementation that produces a different digest or decision for the same vector is non-conformant. The fixture includes expected SHA-256 values for stable cases and placeholder markers for cases where only the decision logic is verified.
 
 <Info>
-  See <a href="/guides/test-vectors">Test Vectors</a> for instructions on running the conformance suite in Python and TypeScript.
+  See <a href="/guides/test-vectors">Test vectors</a> for instructions on running the conformance suite in Python and TypeScript.
 </Info>

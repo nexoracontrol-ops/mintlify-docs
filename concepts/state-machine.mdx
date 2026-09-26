@@ -1,6 +1,6 @@
 ---
-title: "Core State Machine: Integration Surface for EK-021"
-sidebarTitle: "State Machine"
+title: "Core state machine: Integration surface for EK-021"
+sidebarTitle: "State machine"
 description: "The CoreStateMachine is an integration surface that tracks protocol lifecycle states. It sits alongside EK-021 and is triggered by mapping admissibility decisions to state transitions."
 ---
 
@@ -110,9 +110,9 @@ sm.transition(Trigger.AUTHORIZED); // throws Error
 EK-021 does not write state, authorize execution, or issue receipts. The state machine is the layer that performs those actions. EK-021 only produces the admissibility decision that informs which trigger your integration should fire next.
 
 <Info>
-  For the complete transition table, see <a href="/reference/states-and-triggers">States and Triggers</a>.
+  For the complete transition table, see <a href="/reference/states-and-triggers">States and triggers</a>.
 </Info>
 
 <Info>
-  For a step-by-step guide to wiring EK-021 into the state machine, see <a href="/guides/integrating-state-machine">Integrating the State Machine</a>.
+  For a step-by-step guide to wiring EK-021 into the state machine, see <a href="/guides/integrating-state-machine">Integrating the state machine</a>.
 </Info>

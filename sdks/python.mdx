@@ -111,7 +111,7 @@ cd python
 python -m unittest discover -v
 ```
 
-The suite iterates every case in `test-vectors/core-v1.json`. When an expected `input_sha256` starts with `REPLACE`, the hash assertion is intentionally skipped so that the lock step can regenerate it. See [Parity Testing](/guides/parity-testing) and [Test Vectors](/guides/test-vectors).
+The suite iterates every case in `test-vectors/core-v1.json`. When an expected `input_sha256` starts with `REPLACE`, the suite intentionally skips the hash assertion so that the lock step can regenerate it. See [Parity testing](/guides/parity-testing) and [Test vectors](/guides/test-vectors).
 
 <Note>
   Dataclasses are frozen. Rebuild the list to change evidence or controls; you cannot mutate them in place.

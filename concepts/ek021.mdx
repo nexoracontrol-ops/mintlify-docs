@@ -1,10 +1,10 @@
 ---
-title: "EK-021: Deterministic Admissibility Engine"
+title: "EK-021: Deterministic admissibility engine"
 sidebarTitle: "EK-021"
 description: "EK-021 is the central admissibility decision engine in NEXORA Core v1. It produces a deterministic Decision from canonical evidence and controls."
 ---
 
-EK-021 is the admissibility decision engine at the heart of NEXORA Core v1. Given a set of evidence anchors and control parameters, it produces a deterministic `Decision` that states whether the submitted evidence is admissible, whether a deviation exists, and what monetary delta (if any) was detected. Every implementation, whether in Python or TypeScript, must produce the same digest and the same decision for the same input. This page explains how EK-021 works, what it guarantees, and where its authority ends.
+EK-021 is the admissibility decision engine at the heart of NEXORA Core v1. Given a set of evidence anchors and control parameters, it produces a deterministic `Decision`. The `Decision` states whether the submitted evidence is admissible, whether a deviation exists, and what monetary delta (if any) EK-021 detected. Every implementation, whether in Python or TypeScript, must produce the same digest and the same decision for the same input. This page explains how EK-021 works, what it guarantees, and where its authority ends.
 
 ## Decision pipeline
 
@@ -54,13 +54,13 @@ EK-021 is an **admissibility decision engine only**. It does not perform any act
 - Issue an Economic Receipt
 
 <Info>
-  Any system that needs to act on an EK-021 decision, such as advancing a state machine or recording a settlement, must do so in a separate component outside EK-021. See the <a href="/concepts/state-machine">State Machine</a> page for the integration surface described in Protocol Lock L7.
+  Any system that needs to act on an EK-021 decision, such as advancing a state machine or recording a settlement, must do so in a separate component outside EK-021. See the <a href="/concepts/state-machine">State machine</a> page for the integration surface described in Protocol Lock L7.
 </Info>
 
 ## Explore related concepts
 
 <CardGroup cols={3}>
-  <Card title="Canonical Input" href="/concepts/canonical-input">
+  <Card title="Canonical input" href="/concepts/canonical-input">
     Learn which fields enter the digest and how JCS + SHA-256 guarantee parity.
   </Card>
 
@@ -68,7 +68,7 @@ EK-021 is an **admissibility decision engine only**. It does not perform any act
     Understand the Decision object, status codes, and branching logic.
   </Card>
 
-  <Card title="Authority Boundary" href="/reference/authority-boundary">
+  <Card title="Authority boundary" href="/reference/authority-boundary">
     Reference list of everything EK-021 explicitly does not do.
   </Card>
 </CardGroup>

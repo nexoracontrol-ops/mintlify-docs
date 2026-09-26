@@ -1,5 +1,5 @@
 ---
-title: "Decision Object, Status Codes, and Branching Logic"
+title: "Decision object, status codes, and branching logic"
 sidebarTitle: "Decisions"
 description: "The EK-021 Decision object carries the admissibility result, monetary amounts, and reason codes. Learn the three status branches and how decide() evaluates evidence."
 ---
@@ -33,7 +33,7 @@ The `Decision` object is the sole output of EK-021. It tells you whether the sub
 </ResponseField>
 
 <ResponseField name="reason_codes" type="string[]">
-  Tuple or array of reason codes. Exactly one code is returned for every decision.
+  Tuple or array of reason codes. `decide()` returns exactly one code for every decision.
 </ResponseField>
 
 <ResponseField name="input_sha256" type="string">
@@ -132,5 +132,5 @@ Result: `ADMISSIBLE_DEVIATION_DETECTED` / `CLAIM`, `delta_amount` = `"3000.00"`,
 Result: `INADMISSIBLE_EVIDENCE_GAP` / `null`, all amounts `"0.00"`, reason `MISSING_REQUIRED_ANCHOR`.
 
 <Info>
-  For the full conformance fixture, see <a href="/guides/test-vectors">Test Vectors</a>. For how monetary values are handled, see <a href="/concepts/money">Money</a>.
+  For the full conformance fixture, see <a href="/guides/test-vectors">Test vectors</a>. For how monetary values are handled, see <a href="/concepts/money">Money</a>.
 </Info>

@@ -1,7 +1,7 @@
 ---
 title: "Money handling: Decimal strings and BigInt cents"
 sidebarTitle: "Money"
-description: "NEXORA Core v1 represents all monetary values as decimal strings. Python uses Decimal with ROUND_HALF_UP, and TypeScript uses bigint cents to avoid IEEE-754 rounding errors."
+description: "NEXORA Core v1 stores money as decimal strings. Python quantizes Decimal with ROUND_HALF_UP, and TypeScript uses bigint cents to avoid IEEE-754 errors."
 ---
 
 Protocol Lock L3 requires that all monetary values in NEXORA Core v1 be decimal strings. This rule exists to eliminate the rounding errors that come from IEEE-754 floating-point arithmetic. The Python and TypeScript implementations follow the same rule with different but equivalent mechanics: Python uses `Decimal` with `ROUND_HALF_UP` quantization, while TypeScript uses `bigint` cents. This page explains both approaches and shows how to convert, round, and compare money safely.

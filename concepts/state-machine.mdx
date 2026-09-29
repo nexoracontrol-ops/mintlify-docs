@@ -1,7 +1,7 @@
 ---
 title: "Core state machine: Integration surface for EK-021"
 sidebarTitle: "State machine"
-description: "The CoreStateMachine is an integration surface that tracks protocol lifecycle states. It sits alongside EK-021 and is triggered by mapping admissibility decisions to state transitions."
+description: "CoreStateMachine tracks protocol lifecycle states alongside EK-021. Learn the state and trigger IDs and how to map decisions to legal transitions."
 ---
 
 The `CoreStateMachine` is the integration surface described in Protocol Lock L7. It is **not** part of EK-021. Instead, it lives alongside the decision engine and tracks the lifecycle of a protocol instance from initial evidence collection through settlement or termination. A caller runs EK-021 to produce a `Decision`, then maps that decision to a state machine trigger to advance the workflow. This page explains the state and trigger model, how decisions map to transitions, and where the boundary lies between deciding and acting.

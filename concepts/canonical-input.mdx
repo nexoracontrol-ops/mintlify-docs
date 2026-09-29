@@ -1,7 +1,7 @@
 ---
 title: "Canonical input: L0 fields and digest pipeline"
 sidebarTitle: "Canonical input"
-description: "Canonical input defines exactly which evidence and control fields enter the EK-021 digest. Only L0 fields are serialized with RFC 8785 JCS and hashed with SHA-256."
+description: "Learn which L0 evidence and control fields enter the EK-021 digest, the exclusion list, and the RFC 8785 JCS and SHA-256 canonicalization pipeline."
 ---
 
 Canonical input is the foundation of deterministic parity in NEXORA Core v1. EK-021 accepts rich evidence and control objects at runtime, but only a strict subset of fields, called L0, enters the digest. This ensures that two implementations running on different hosts produce identical SHA-256 hashes for the same logical input. This page documents the L0 field list, the exclusion rules, and the JCS + SHA-256 pipeline.
